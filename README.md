@@ -23,3 +23,4 @@ Once the compilation is complete, you can add the specified compression paramete
  Optional parameter: Same as weights_compress
  ### activations_compress_param:
  Optional parameter: Same as weights_compress_param
+
