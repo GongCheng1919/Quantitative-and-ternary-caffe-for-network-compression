@@ -10,9 +10,13 @@ Once the compilation is complete, you can add the specified compression paramete
  Optional parameter: ""(default),"Ternary","Ternary_Quantize","Quantize"
 ### weights_caompress_param: 
  Optional parameter:  
- delta: Threshold of the step function (for ternary) 
+ 
+ delta: Threshold of the step function (for ternary)
+ 
  alpha: Scaling factor (for ternary)
+ 
  fixedpos: Fixed position (for quantize)
+ 
  maxbits: Store the maximum number of quantized integers (for quantize)
  
  ### activations_compress: 
