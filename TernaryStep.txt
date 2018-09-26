@@ -1,0 +1,47 @@
+Tenery implementation step
+1、思路：在Blob中添加alpha及delta参数，并实现数值三值化操作，然后在layer前向传播之前对权值三值化
+	需要注意的是：需要把alpha加入到三值化后的结果中以便实现和原先一样的操作，还是按照论文中
+	描述，即在做前向传播的时候，将alpha与input相乘（而非对权值做操作，初步暂定对权值操作）
+	
+2、代码更新步骤：
+	1、Blobproto中添加私有delta及alpha变量，以便进行三值化操作
+	[完成]
+	2、在Blob类中添加三值化操作，比较复杂，分步实现为：
+		1、计算delta及alpha【通过setdelta及setalpha函数】,由于proto数据结构为自动生成，因此难以在
+		数据结构中添加操作，于是需要在Blob类中增加对blob的以下操作
+			1、在Blob.hpp中添加函数申明如下：
+			///set_delta and alpha for Ternarize
+			bool set_delta();
+			Dtype get_alpha() const;
+			Dtype get_delta() const;
+			///Ternarize data
+			bool ternarize_data(Phase phase = TRAIN);
+			2、在Blob.hpp中添加变量alpha_与delta_
+			float delta_;
+			float alpha_;
+			3、在Blob.cpp的函数FromProto、FromProto中实现变量的导入导出
+			4、实现1中的函数，此时需要用到math_function内的函数，在该文件中添加函数，此处的GPU函数或许有问题
+			
+			5、
+
+			
+3、新的开始：
+	1、在caffe.proto中的Blobproto增加 alpha、delta、ternary数据区域
+	2、在Blob class中添加对ternary数据的读取支持（cpu_ternary() 和 gpu_ternary())
+	3、在Blob class中添加对ternary数据的存取支持（CopyFrom,FromProto及ToProto）
+	4、在Blob class中添加set/get_delta,set/get_alpha函数，实现ternarize_data函数(同时实现了三值化，以及scale过程)
+	5、在Layer class的前向传播中，使用ternary data替换全精度进行前向传播计算,为了方便实现
+		ternary与data数据指针的交换，需要在Blob class中添加exchange_data_ternary函数进行状
+		态切换及记录，并添加EXCHANGE_DATA_TERNARY私有变量，保证在交换后，是由cpu_ternary替换
+		cpu_data的返回值（以及gpu,matable，set函数）
+	6、在Layer class的前向传播函数中，在前向传播之前，计算三值化权值ternary，并且调用exchange_data_ternary
+		函数，切换使用三值权值进行前向传播，并在前向传播完成后，切换回data以便进行反向传播。
+	7、在caffe.proto中的LayerParameter增加compression参数，以确定该层采用何种压缩方法，缺失则表示不使用压缩
+	8、在solver class中添加accuray_list 及 loss_list，以便在训练完成之后，获取训练的状态
+	
+4、量化的步骤：
+	1、在caffe.proto中的Blobproto增加 fixedpos、maxbits、quantize数据区域,用于存储量化数值
+	2、在Blob class中添加对quantize数据的读取支持（cpu_quantize() 和 gpu_quantize())
+	3、在Blob class中添加对quantize数据的存取支持（CopyFrom,FromProto及ToProto）
+	4、在Blob class中添加set/get_fixedpos,set/get_maxbits函数，实现quantize_data函数(同时实现scale过程)
+	

@@ -1,0 +1,21 @@
+# reduce learning rate after 120 epochs (60000 iters) by factor 0f 10
+# then another factor of 10 after 10 more epochs (5000 iters)
+
+# The train/test net protocol buffer definition
+net: "examples/cifar10/cifar10_full_train_test_compress_conv.prototxt"
+test_state: { stage: 'test-on-train' }
+test_iter: 500
+test_state: { stage: 'test-on-test' }
+test_iter: 100
+test_interval: 1000
+test_compute_loss: true
+base_lr: 0.00005
+lr_policy: "fixed"
+display: 200
+max_iter: 20000
+weight_decay: 0.004
+snapshot: 10000
+snapshot_prefix: "examples/cifar10/model/cifar10_full_compress_adam"
+# solver mode: CPU or GPU
+solver_mode: GPU
+type: "AdaGrad"
