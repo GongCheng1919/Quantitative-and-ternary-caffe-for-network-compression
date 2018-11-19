@@ -1,5 +1,8 @@
 #include <math_functions.h>  // CUDA's, not caffe's, for fabs, signbit
 #include <thrust/device_vector.h>
+
+#include <curand_kernel.h> //curand device function 
+
 #include <thrust/functional.h>  // thrust::plus
 #include <thrust/reduce.h>
 
@@ -488,6 +491,9 @@ void caffe_gpu_ternary<unsigned>(const int N, const unsigned delta, const unsign
 template <>
 void caffe_gpu_ternary<float>(const int N, const float delta, const float* X, float* Y,float* alpha) {
 // NOT IMPLEMENT
+	//clock_t ed;
+	//double stime;
+	//ed=clock();
   ternary_kernel<float><<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(N, delta, X, Y);
   const float* ternary_data=(const float*)Y;
   float pa = 0;
@@ -495,6 +501,8 @@ void caffe_gpu_ternary<float>(const int N, const float delta, const float* X, fl
   float pb = 0;
   caffe_gpu_dot(N, ternary_data, ternary_data, &pb);
   *alpha = (pa) / ((pb) + 1e-6);
+  //stime=(double)(clock() - ed)/CLOCKS_PER_SEC;
+//LOG(INFO)<<"quantize time is "<<stime*1000<<"ms";
   //std::cout<<"pa="<<pa<<", pb="<<pb<<", alpha="<<*alpha<<std::endl;
 }
 
@@ -514,6 +522,8 @@ template <typename Dtype>
 __global__ void quantize_kernel(const int n,const Dtype fixed_value, const Dtype max_num, const Dtype min_num, const Dtype* X, Dtype* Y){
 	CUDA_KERNEL_LOOP(index, n){
 		Dtype x_q = X[index] / fixed_value;
+		// create a rand N satisfy uniform(-0.5,0.5)
+		x_q+=Y[index];//给x_q加上随机数，此处的Y已经倍初始化为随机数了
 		x_q = (x_q > 0.0) ? floor(x_q + 0.5) : ceil(x_q - 0.5);
 		if (x_q >= max_num)
 		{
@@ -554,12 +564,17 @@ void caffe_gpu_quantizea<double>(const int count, const double* X, double* Y, in
 	const double max_num = pow(2, max_bits);
 	const double min_num = -max_num;
 	const double fixed_value = pow(2, *fixed_point);
+	//先将Y初始化为-0.5到0.5的随机数,然后使用Y对X的量化结构加噪声
+	caffe_gpu_rng_uniform(count,double(-0.5),double(0.5),Y);
 	//计算量化结果
 	quantize_kernel << <CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS >> >(count, fixed_value,max_num,min_num, X, Y);
 }
 template<>
 void caffe_gpu_quantizea<float>(const int count, const float* X, float* Y, int* fixed_point, int max_bits, bool calc_fixed_point){
 	//寻找最大值的定点位置
+	//clock_t ed;
+	//double stime;
+	//ed=clock();
 	if(calc_fixed_point){
 		int max_index;
 		CUBLAS_CHECK(cublasIsamax(Caffe::cublas_handle(),count, X, 1, &max_index));
@@ -576,12 +591,22 @@ void caffe_gpu_quantizea<float>(const int count, const float* X, float* Y, int* 
 			*fixed_point = floor(log2(max_n)) - (max_bits - 1);
 		}
 	}
+	//stime=(double)(clock() - ed)/CLOCKS_PER_SEC;
+	//LOG(INFO)<<"find max time is "<<stime*1000<<"ms";
 	const float max_num = pow(2, max_bits);
 	const float min_num = -max_num;
 	const float fixed_value = pow(2, *fixed_point);
 	//std::cout<<"fixed_point is "<<*fixed_point<<std::endl;
+	//先将Y初始化为-0.5到0.5的随机数,然后使用Y对X的量化结构加噪声
+	//ed=clock();
+	caffe_gpu_rng_uniform(count,float(-0.5),float(0.5),Y);
+	//stime=(double)(clock() - ed)/CLOCKS_PER_SEC;
+	//LOG(INFO)<<"generate rand time is "<<stime*1000<<"ms";
 	//计算量化结果
+	//ed=clock();
 	quantize_kernel << <CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS >> >(count, fixed_value,max_num,min_num, X, Y);
+	//stime=(double)(clock() - ed)/CLOCKS_PER_SEC;
+	//LOG(INFO)<<"quantize time is "<<stime*1000<<"ms";
 }
 
 }  // namespace caffe

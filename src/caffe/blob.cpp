@@ -305,6 +305,8 @@ template <typename Dtype>
 void Blob<Dtype>::ShareData(const Blob& other) {
   CHECK_EQ(count_, other.count());
   data_ = other.data();
+  ternary_=other.ternary();
+  quantize_=other.quantize();
 }
 
 template <typename Dtype>
@@ -620,16 +622,20 @@ bool Blob<Dtype>::set_maxbits(const int maxbits){
 // 三值化
 // revised 2016-3-21
 template <typename Dtype>
-void Blob<Dtype>::quantize_data(Phase phase,CompressParameter compress_param){
-if(phase != TRAIN && phase!=TEST)
-	return;
-
+void Blob<Dtype>::quantize_data(Phase phase,CompressParameter compress_param,string compress_type){
+	if(phase==TEST && quantize_ && compress_type=="weights"){//如果是weights，则不需要重新根据全精度值计算量化值
+		//std::cout<<"quantize_="<<quantize_<<",compress_type="<<compress_type
+		//<<",fixedpos_="<<fixedpos_<<",maxbits_="<<maxbits_<<std::endl;
+		return;
+	}
   // const Dtype delta = 0; // default value; 
   // const Dtype delta = (Dtype) 0.8 * this->asum_data() / this->count();
   //int fixed_pos=0;
   int max_bits=8;
   bool calc_fixed_point=true;
   if(phase == TEST){
+	  //std::cout<<"Quantize phase==Test : has_fixedpos="<<compress_param.has_fixedpos()
+		//	<<",fixedpos="<<compress_param.fixedpos()<<std::endl;
 	  if(compress_param.has_fixedpos() && compress_param.fixedpos()!=0){
 		fixedpos_=compress_param.fixedpos();
 		calc_fixed_point=false;
@@ -640,12 +646,16 @@ if(phase != TRAIN && phase!=TEST)
   }else{
 	  set_maxbits(max_bits);
   }
+  //LOG(INFO)<<"Quantize data function : calc_fixed_point="<<calc_fixed_point
+	//		<<", fixedpos_="<<fixedpos_
+	//		<<", maxbits_="<<maxbits_
+	//		<<std::endl;
   if(maxbits_<=0){return;}
   if (!data_) { return; }
   CHECK(data_);
   switch (data_->head()) {
   case SyncedMemory::HEAD_AT_CPU:
-{
+{	//std::cout<<"Go to CPU mode"<<std::endl;
 	caffe_cpu_quantizea<Dtype>(this->count(), (const Dtype*)data_->cpu_data(), this->mutable_cpu_quantize(),&fixedpos_,maxbits_,calc_fixed_point);
 	Dtype scaler=pow(2,fixedpos_);
 	caffe_cpu_scale(this->count(), scaler, this->cpu_quantize(), this->mutable_cpu_quantize());
@@ -654,7 +664,7 @@ if(phase != TRAIN && phase!=TEST)
   case SyncedMemory::HEAD_AT_GPU:
   case SyncedMemory::SYNCED:
 #ifndef CPU_ONLY
-{
+{	//std::cout<<"Go to GPU mode"<<std::endl;
     caffe_gpu_quantizea<Dtype>(this->count(), (const Dtype*)data_->gpu_data(), this->mutable_gpu_quantize(),&fixedpos_,maxbits_,calc_fixed_point);
 	Dtype scaler=pow(2,fixedpos_);
 	caffe_gpu_scale(this->count(), scaler, this->gpu_quantize(), this->mutable_gpu_quantize());
@@ -672,10 +682,12 @@ if(phase != TRAIN && phase!=TEST)
 // 三值化，并对scaler进行量化
 // revised 2018-9-6
 template <typename Dtype>
-void Blob<Dtype>::ternarize_data(Phase phase,bool quantize_alpha,CompressParameter compress_param){
-if(phase != TRAIN && phase!=TEST)
-        return;
-
+void Blob<Dtype>::ternarize_data(Phase phase,bool quantize_alpha,CompressParameter compress_param,string compress_type){
+	if(phase==TEST && ternary_ && compress_type=="weights"){
+        //std::cout<<"ternayr_="<<ternary_<<",compress_type="<<compress_type
+		//<<",delta_="<<delta_<<",alpha_="<<alpha_<<std::endl;
+		return;
+	}
   // const Dtype delta = 0; // default value; 
   // const Dtype delta = (Dtype) 0.8 * this->asum_data() / this->count();
   
@@ -684,7 +696,14 @@ if(phase != TRAIN && phase!=TEST)
    int maxbits=8;
    bool calc_fixed_point=true;
    if(phase == TEST && compress_param.has_delta() && compress_param.delta()!=0){
-        //使用存在的delta参数
+        //std::cout<<"Ternary phase==Test : has_delta="<<compress_param.has_delta()
+			//<<",delta="<<compress_param.delta()
+			//<<",has_alpha="<<compress_param.has_alpha()
+			//<<",alpha="<<compress_param.alpha()
+			//<<",has_fixedpos="<<compress_param.has_fixedpos()
+			//<<",fixedpos="<<compress_param.fixedpos()
+			//<<std::endl;
+		//使用存在的delta参数
 		if(compress_param.has_delta() && compress_param.delta()!=0){
 			delta_=compress_param.delta();
 		}
@@ -709,6 +728,12 @@ if(phase != TRAIN && phase!=TEST)
   }else{
 	  set_maxbits(maxbits);
   }
+    //LOG(INFO)<<"Ternary data function : calc_fixed_point="<<calc_fixed_point
+	//		<<", delta_="<<delta_
+	//		<<", alpha_="<<alpha_
+	//		<<", fixedpos_="<<fixedpos_
+	//		<<", maxbits_="<<maxbits_
+	//		<<std::endl;
   if (!data_) { return; }
   switch (data_->head()) {
   case SyncedMemory::HEAD_AT_CPU:
@@ -829,7 +854,7 @@ void Blob<Dtype>::FromProto(const BlobProto& proto, bool reshape) {
       shape[1] = proto.channels();
       shape[2] = proto.height();
       shape[3] = proto.width();
-    } else {
+    } else { 
       shape.resize(proto.shape().dim_size());
       for (int i = 0; i < proto.shape().dim_size(); ++i) {
         shape[i] = proto.shape().dim(i);
@@ -866,19 +891,6 @@ void Blob<Dtype>::FromProto(const BlobProto& proto, bool reshape) {
     }
   }
   //GC
-  if (proto.double_ternary_size() > 0) {
-    CHECK_EQ(count_, proto.double_ternary_size());
-    Dtype* ternary_vec = mutable_cpu_ternary();
-    for (int i = 0; i < count_; ++i) {
-      ternary_vec[i] = proto.double_ternary(i);
-    }
-  } else if (proto.ternary_size() > 0) {
-    CHECK_EQ(count_, proto.ternary_size());
-    Dtype* ternary_vec = mutable_cpu_ternary();
-    for (int i = 0; i < count_; ++i) {
-      ternary_vec[i] = proto.ternary(i);
-    }
-  }
   // get alpha and delta from proto object
   if(proto.has_delta() && proto.has_alpha()){
 	delta_=Dtype(proto.delta());
@@ -887,27 +899,51 @@ void Blob<Dtype>::FromProto(const BlobProto& proto, bool reshape) {
 	delta_=Dtype(0);
 	alpha_=Dtype(0);
   }
+  // get fixedpos_ and maxbits_ from proto object
+  if(proto.has_fixedpos() && proto.has_maxbits()){
+	fixedpos_=Dtype(proto.fixedpos());
+	maxbits_=Dtype(proto.maxbits());
+	//如果alpha！=0,则对alpha做反量化
+	alpha_=alpha_*pow(2,fixedpos_);
+  }else{
+	fixedpos_=0;
+	maxbits_=8;
+  }
+  std::cout<<"delta_="<<delta_<<",alpha_="<<alpha_<<",fixedpos_="<<fixedpos_
+  <<",maxbits_="<<maxbits_<<std::endl;
+  //generate ternary
+  if (proto.double_ternary_size() > 0) {
+    CHECK_EQ(count_, proto.double_ternary_size());
+    Dtype* ternary_vec = mutable_cpu_ternary();
+    for (int i = 0; i < count_; ++i) {
+		//需要注意的是，会进行scaler缩放
+      ternary_vec[i] = proto.double_ternary(i)*alpha_;
+    }
+  } else if (proto.ternary_size() > 0) {
+    CHECK_EQ(count_, proto.ternary_size());
+    Dtype* ternary_vec = mutable_cpu_ternary();
+    for (int i = 0; i < count_; ++i) {
+		//需要注意的是，会进行scaler缩放
+      ternary_vec[i] = proto.ternary(i)*alpha_;
+    }
+  }
+  //generate quantize
   if (proto.double_quantize_size() > 0) {
     CHECK_EQ(count_, proto.double_quantize_size());
     Dtype* quantize_vec = mutable_cpu_quantize();
     for (int i = 0; i < count_; ++i) {
-      quantize_vec[i] = proto.double_quantize(i);
+		//进行反量化
+      quantize_vec[i] = proto.double_quantize(i)*pow(2,fixedpos_);
     }
   } else if (proto.quantize_size() > 0) {
     CHECK_EQ(count_, proto.quantize_size());
     Dtype* quantize_vec = mutable_cpu_quantize();
     for (int i = 0; i < count_; ++i) {
-      quantize_vec[i] = proto.quantize(i);
+		//进行反量化
+      quantize_vec[i] = proto.quantize(i)*pow(2,fixedpos_);
     }
   }
-  // get fixedpos_ and maxbits_ from proto object
-  if(proto.has_fixedpos() && proto.has_maxbits()){
-	delta_=Dtype(proto.fixedpos());
-	alpha_=Dtype(proto.maxbits());
-  }else{
-	fixedpos_=0;
-	maxbits_=0;
-  }
+  
 }
 
 template <>
@@ -936,7 +972,7 @@ void Blob<double>::ToProto(BlobProto* proto, bool write_diff) const {
     }
 	//set delta and alpha to proto
 	proto->set_delta(get_delta());
-	if(maxbits_>0){
+	if(fixedpos_!=0){
 		double scaler=pow(2,fixedpos_);
 		proto->set_alpha(get_alpha()/scaler);//缩放回定点整数
 		//保存量化的定点位置
@@ -945,7 +981,7 @@ void Blob<double>::ToProto(BlobProto* proto, bool write_diff) const {
 	}else{
 		proto->set_alpha(get_alpha());//alpha不做定点
 	}
-  }else if(save_quantize&&delta_==0&&alpha_==0&&maxbits_!=0){
+  }else if(save_quantize&&delta_==0&&alpha_==0&&fixedpos_!=0){
 	//按照最新的权值进行三值化
 	//ternarize_data(TEST);
 	//写入模型
@@ -994,7 +1030,7 @@ void Blob<float>::ToProto(BlobProto* proto, bool write_diff) const {
     }
 	//set delta and alpha to proto
 	proto->set_delta(get_delta());
-	if(maxbits_>0){
+	if(fixedpos_!=0){
 		float scaler=pow(2,fixedpos_);
 		proto->set_alpha(get_alpha()/scaler);//缩放回定点整数
 		//保存量化的定点位置
@@ -1003,7 +1039,7 @@ void Blob<float>::ToProto(BlobProto* proto, bool write_diff) const {
 	}else{
 		proto->set_alpha(get_alpha());//alpha不做定点
 	}
-  }else if(save_quantize&&delta_==0&&alpha_==0&&maxbits_>0){
+  }else if(save_quantize&&delta_==0&&alpha_==0&&fixedpos_!=0){
 	//按照最新的权值进行三值化
 	//ternarize_data(TEST);
 	//写入模型

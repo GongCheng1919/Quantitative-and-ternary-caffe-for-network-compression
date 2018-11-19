@@ -454,8 +454,17 @@ void caffe_cpu_quantizea<float>(const int count, const float* X, float* Y, int* 
 	const float max_num = pow(2, max_bits);
 	const float min_num = -max_num;
 	const float fixed_value = pow(2, *fixed_point);
+	//生成随机数，用于随机化量化
+	boost::uniform_real<float> random_distribution(-0.5, caffe_nextafter<float>(0.5));
+	boost::variate_generator<caffe::rng_t*, boost::uniform_real<float> >
+      variate_generator(caffe_rng(), random_distribution);
+	//for (int i = 0; i < n; ++i) {
+    //r[i] = variate_generator();
+	//}
 	for (int i = 0; i < count; i++){
 		float x_q = X[i] / fixed_value;
+		float randN=variate_generator();
+		x_q+=randN;
 		x_q = (x_q > 0.0) ? floor(x_q + 0.5) : ceil(x_q - 0.5);
 		if (x_q >= max_num)
 		{
@@ -483,8 +492,15 @@ void caffe_cpu_quantizea<double>(const int count, const double* X, double* Y, in
 	const double max_num = pow(2, max_bits);
 	const double min_num = -max_num;
 	const double fixed_value = pow(2, *fixed_point);
+	//生成随机数，用于随机化量化
+	boost::uniform_real<double> random_distribution(-0.5, caffe_nextafter<double>(0.5));
+	boost::variate_generator<caffe::rng_t*, boost::uniform_real<double> >
+      variate_generator(caffe_rng(), random_distribution);
 	for (int i = 0; i < count; i++){
 		double x_q = X[i] / fixed_value;
+		double randN=variate_generator();
+		x_q+=randN;
+		//round
 		x_q = (x_q > 0.0) ? floor(x_q + 0.5) : ceil(x_q - 0.5);
 		if (x_q >= max_num)
 		{

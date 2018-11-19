@@ -217,6 +217,16 @@ class Blob {
     CHECK(data_);
     return data_;
   }
+  
+  //ternary and quantize
+  inline const shared_ptr<SyncedMemory>& ternary() const {
+    CHECK(ternary_);
+    return ternary_;
+  }
+  inline const shared_ptr<SyncedMemory>& quantize() const {
+    CHECK(quantize_);
+    return quantize_;
+  }
 
   inline const shared_ptr<SyncedMemory>& diff() const {
     CHECK(diff_);
@@ -273,13 +283,14 @@ class Blob {
   ///Ternarize data
   //@quantize_alpha：是否量化alpha
   //@maxbits：量化alpha的bit数
-  void ternarize_data(Phase phase = TRAIN,bool quantize_alpha=false,CompressParameter compress_param=CompressParameter());
+  //@compress_type:指定压缩的数据是weights or activations：对activations需要每次都做操作，而对weights只需要在训练阶段做
+  void ternarize_data(Phase phase = TRAIN,bool quantize_alpha=false,CompressParameter compress_param=CompressParameter(),string compress_type="weights");
   ///Quantize data @ return fixed position
   //bool set_fixedpos(const int fixedpos);
   bool set_maxbits(const int mabits);
   int get_fixedpos() const;
   int get_maxbits() const;
-  void quantize_data(Phase phase = TRAIN,CompressParameter compress_param=CompressParameter());
+  void quantize_data(Phase phase = TRAIN,CompressParameter compress_param=CompressParameter(),string compress_type="weights");
 
 
 

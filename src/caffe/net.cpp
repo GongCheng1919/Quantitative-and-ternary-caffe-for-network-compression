@@ -36,6 +36,17 @@ Net<Dtype>::Net(const string& param_file, Phase phase,
       param.mutable_state()->add_stage((*stages)[i]);
     }
   }
+  //输出载入的参数
+  for(int i=0;i<param.layer_size();i++){
+	  std::cout<<"\n"<<param.layer(i).name()<<": activations_compress_param_size="
+	  <<param.layer(i).activations_compress_param_size()<<"\n";
+	  if(param.layer(i).activations_compress_param_size()>0){
+		  std::cout<<"delta="<<param.layer(i).activations_compress_param(0).delta()
+					<<",alpha="<<param.layer(i).activations_compress_param(0).alpha()
+					<<",fixedpos="<<param.layer(i).activations_compress_param(0).fixedpos()
+					<<",maxbits="<<param.layer(i).activations_compress_param(0).maxbits();
+	  }
+  }
   param.mutable_state()->set_level(level);
   Init(param);
 }
@@ -664,6 +675,7 @@ void Net<Dtype>::UpdateDebugInfo(const int param_id) {
 template <typename Dtype>
 void Net<Dtype>::ShareTrainedLayersWith(const Net* other) {
   int num_source_layers = other->layers().size();
+  LOG(INFO)<<"Load LayerParameter from Train Net";
   for (int i = 0; i < num_source_layers; ++i) {
     Layer<Dtype>* source_layer = other->layers()[i].get();
     const string& source_layer_name = other->layer_names()[i];
@@ -679,6 +691,29 @@ void Net<Dtype>::ShareTrainedLayersWith(const Net* other) {
     DLOG(INFO) << "Copying source layer " << source_layer_name;
     vector<shared_ptr<Blob<Dtype> > >& target_blobs =
         layers_[target_layer_id]->blobs();
+	//设置layer param
+	LayerParameter* target_layer_param= layers_[target_layer_id]->mutable_layer_param();
+	const LayerParameter src_layer_param= source_layer->layer_param();
+	//copy compress_param from source_layer to target_layer_param
+	//LOG(INFO)<<"Load LayerParameter from .caffemodel file for layer : "<<source_layer_name;
+	//LOG(INFO)<<"source weights_compress_param_size="<<src_layer_param.weights_compress_param_size();
+	for(int i=0;i<src_layer_param.weights_compress_param_size() && i<target_layer_param->weights_compress_size();i++)
+	{
+		if(i>=target_layer_param->weights_compress_param_size()){
+			target_layer_param->add_weights_compress_param();
+		}
+		target_layer_param->mutable_weights_compress_param(i)->CopyFrom(src_layer_param.weights_compress_param(i));
+	}
+	//LOG(INFO)<<"source activations_compress_param_size="<<src_layer_param.activations_compress_param_size();
+	for(int i=0;i<src_layer_param.activations_compress_param_size() && i<target_layer_param->activations_compress_size();i++)
+	{
+		if(i>=target_layer_param->activations_compress_param_size()){
+			target_layer_param->add_activations_compress_param();
+		}
+		target_layer_param->mutable_activations_compress_param(i)->CopyFrom(src_layer_param.activations_compress_param(i));
+	}
+	//LOG(INFO)<<"Have loaded LayerParameter from .caffemodel file for layer : "<<source_layer_name;
+    //end GC
     CHECK_EQ(target_blobs.size(), source_layer->blobs().size())
         << "Incompatible number of blobs for layer " << source_layer_name;
     for (int j = 0; j < target_blobs.size(); ++j) {
@@ -745,8 +780,31 @@ void Net<Dtype>::CopyTrainedLayersFrom(const NetParameter& param) {
       continue;
     }
     DLOG(INFO) << "Copying source layer " << source_layer_name;
+	//这里是直接设置blobs
     vector<shared_ptr<Blob<Dtype> > >& target_blobs =
         layers_[target_layer_id]->blobs();
+	//设置layer param
+	LayerParameter* target_layer_param= layers_[target_layer_id]->mutable_layer_param();
+	//LayerParameter* src_layer_param= &source_layer;
+	//copy compress_param from source_layer to target_layer_param
+	LOG(INFO)<<"Load LayerParameter from .caffemodel file for layer : "<<source_layer_name;
+	LOG(INFO)<<"source weights_compress_param_size="<<source_layer.weights_compress_param_size();
+	for(int i=0;i<source_layer.weights_compress_param_size() && i<target_layer_param->weights_compress_size();i++)
+	{
+		if(i>=target_layer_param->weights_compress_param_size()){
+			target_layer_param->add_weights_compress_param();
+		}
+		target_layer_param->mutable_weights_compress_param(i)->CopyFrom(source_layer.weights_compress_param(i));
+	}
+	LOG(INFO)<<"source activations_compress_param_size="<<source_layer.activations_compress_param_size();
+	for(int i=0;i<source_layer.activations_compress_param_size() && i<target_layer_param->activations_compress_size();i++)
+	{
+		if(i>=target_layer_param->activations_compress_param_size()){
+			target_layer_param->add_activations_compress_param();
+		}
+		target_layer_param->mutable_activations_compress_param(i)->CopyFrom(source_layer.activations_compress_param(i));
+	}
+	LOG(INFO)<<"Have loaded LayerParameter from .caffemodel file for layer : "<<source_layer_name;
     CHECK_EQ(target_blobs.size(), source_layer.blobs_size())
         << "Incompatible number of blobs for layer " << source_layer_name;
     for (int j = 0; j < target_blobs.size(); ++j) {
