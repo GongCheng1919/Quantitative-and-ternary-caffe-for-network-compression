@@ -3,7 +3,7 @@ Quantitative and ternary caffe for network compression.
 
 # Compiler
 You need to change the configuration file (Makeconfig) according to your platform.
-# Use
+# Usage
 Once the compilation is complete, you can add the specified compression parameters to each layer to indicate the compression operations the layer needs to perform:
 
 ### weights_compress: 
