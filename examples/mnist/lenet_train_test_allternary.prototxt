@@ -15,6 +15,7 @@ layer {
     batch_size: 64
     backend: LMDB
   }
+  activations_compress:"Quantize"
 }
 layer {
   name: "mnist"
@@ -32,6 +33,7 @@ layer {
     batch_size: 100
     backend: LMDB
   }
+  activations_compress:"TQuantize"
 }
 layer {
   name: "conv1"
@@ -44,8 +46,9 @@ layer {
   param {
     lr_mult: 2
   }
-  compress:"Ternary"
-  compress:"Ternary"
+  weights_compress:"Ternary_Quantize"
+  weights_compress:"Ternary_Quantize"
+  activations_compress:"Ternary_Quantize"
   convolution_param {
     num_output: 20
     kernel_size: 5
@@ -80,8 +83,9 @@ layer {
   param {
     lr_mult: 2
   }
-  compress:"Ternary"
-  compress:"Ternary"
+  weights_compress:"Ternary_Quantize"
+  weights_compress:"Ternary_Quantize"
+  activations_compress:"Ternary_Quantize"
   convolution_param {
     num_output: 50
     kernel_size: 5
@@ -116,8 +120,9 @@ layer {
   param {
     lr_mult: 2
   }
-  compress:"Ternary"
-  compress:"Ternary"
+  weights_compress:"Ternary_Quantize"
+  weights_compress:"Ternary_Quantize"
+  #activations_compress:"Ternary_Quantize"
   inner_product_param {
     num_output: 500
     weight_filler {
@@ -145,8 +150,6 @@ layer {
   param {
     lr_mult: 2
   }
-  compress:"Ternary"
-  compress:"Ternary"
   inner_product_param {
     num_output: 10
     weight_filler {
