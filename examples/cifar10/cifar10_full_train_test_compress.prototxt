@@ -48,7 +48,7 @@ layer {
   }
   weights_compress:"Ternary_Quantize"
   weights_compress:"Ternary_Quantize"
-  activations_compress:"Ternary_Quantize"
+  
   convolution_param {
     num_output: 32
     pad: 2
@@ -93,7 +93,7 @@ layer {
   }
   weights_compress:"Ternary_Quantize"
   weights_compress:"Ternary_Quantize"
-  activations_compress:"Ternary_Quantize"
+  
   convolution_param {
     num_output: 64
     pad: 2
@@ -132,7 +132,7 @@ layer {
   top: "conv3"
   weights_compress:"Ternary_Quantize"
   weights_compress:"Ternary_Quantize"
-  activations_compress:"Ternary_Quantize"
+  
   convolution_param {
     num_output: 128
     pad: 2
