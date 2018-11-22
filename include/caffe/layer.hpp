@@ -699,37 +699,29 @@ inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
 	//切换激活值为压缩表示
 	ExchangeCompressActivations(top);
 	if(phase_==TEST){
-		static int topbit=0,bottombit=0;
-		int ttopbit=topbit,tbottombit=bottombit;
-		//计算bottom中最高的位
-		//计算top中最高的位
-		for (int i=0;i<bottom.size();i++){
-			//找到最大值
-			const Dtype* temp= bottom[i]->cpu_data();
-			for(int j=0;j<bottom[i]->count();j++){
-				int bitwidth=ceil(log2(temp[j]))+1;
-				if(bitwidth>tbottombit){
-					tbottombit=bitwidth;
-				}
-			}
-		}
+		static Dtype topbit=0,bottombit=1000000;
+		Dtype ttopbit=topbit,tbottombit=bottombit;
+		//计算top中绝对最大值和绝对最小值。
 		for (int i=0;i<top.size();i++){
 			//找到最大值
 			const Dtype* temp= top[i]->cpu_data();
 			for(int j=0;j<top[i]->count();j++){
-				int bitwidth=ceil(log2(temp[j]))+1;
+				Dtype bitwidth=temp[j]>0?temp[j]:-temp[j];
 				if(bitwidth>ttopbit){
 					ttopbit=bitwidth;
+				}
+				if(bitwidth<tbottombit){
+					tbottombit=bitwidth;
 				}
 			}
 		}
 		if(ttopbit>topbit){
 			topbit=ttopbit;
-			std::cout<<layer_param_.name()<<" Top max bit is "<<topbit<<std::endl;
+			std::cout<<layer_param_.name()<<" Top abs max is "<<topbit<<std::endl;
 		}
-		if(tbottombit>bottombit){
+		if(tbottombit<bottombit){
 			bottombit=tbottombit;
-			std::cout<<layer_param_.name()<<" Bottom max bit is "<<bottombit<<std::endl;
+			std::cout<<layer_param_.name()<<" Top abs min is "<<bottombit<<std::endl;
 		}
 	}
   return loss;
