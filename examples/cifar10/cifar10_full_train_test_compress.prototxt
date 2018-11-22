@@ -53,7 +53,7 @@ layer {
     kernel_size: 5
     stride: 1
     weight_filler {
-      type: "gaussian"
+      type: "xavier"
 	  std:0.001
     }
     bias_filler {
@@ -98,7 +98,7 @@ layer {
     kernel_size: 5
     stride: 1
     weight_filler {
-      type: "gaussian"
+      type: "xavier"
 	  std:0.001
     }
     bias_filler {
@@ -137,7 +137,7 @@ layer {
     kernel_size: 5
     stride: 1
     weight_filler {
-      type: "gaussian"
+      type: "xavier"
 	  std:0.001
     }
     bias_filler {
@@ -178,7 +178,7 @@ layer {
   inner_product_param {
     num_output: 10
     weight_filler {
-      type: "gaussian"
+      type: "xavier"
 	  std:0.001
     }
     bias_filler {
