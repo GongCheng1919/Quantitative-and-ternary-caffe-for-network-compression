@@ -4,16 +4,11 @@ layer {
   type: "Data"
   top: "data"
   top: "label"
-  #只对数据最量化
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
-  }
   include {
     phase: TRAIN
   }
   transform_param {
-    mean_file: "examples/cifar10/mean.binaryproto"
+    mean_file: "examples/cifar10/mean_quantize.binaryproto"
   }
   data_param {
     source: "examples/cifar10/cifar10_train_lmdb"
@@ -26,16 +21,11 @@ layer {
   type: "Data"
   top: "data"
   top: "label"
-  #只对数据最量化
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
-  }
   include {
     phase: TEST
   }
   transform_param {
-    mean_file: "examples/cifar10/mean.binaryproto"
+    mean_file: "examples/cifar10/mean_quantize.binaryproto"
   }
   data_param {
     source: "examples/cifar10/cifar10_test_lmdb"
@@ -55,17 +45,8 @@ layer {
     lr_mult: 2
   }
   weights_compress:"Ternary_Quantize"
-  weights_compress_param{
-    maxbits:8
-  }
-  weights_compress:"Quantize"
-  weights_compress_param{
-    maxbits:8
-  }
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
-  }
+  weights_compress:"Ternary_Quantize"
+  activations_compress:"Ternary_Quantize"
   convolution_param {
     num_output: 32
     pad: 2
@@ -73,12 +54,18 @@ layer {
     stride: 1
     weight_filler {
       type: "gaussian"
-      std: 0.0001
+	  std:0.001
     }
     bias_filler {
       type: "constant"
     }
   }
+}
+layer {
+  name: "relu1"
+  type: "ReLU"
+  bottom: "conv1"
+  top: "conv1"
 }
 layer {
   name: "pool1"
@@ -90,16 +77,6 @@ layer {
     kernel_size: 3
     stride: 2
   }
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
-  }
-}
-layer {
-  name: "relu1"
-  type: "ReLU"
-  bottom: "pool1"
-  top: "pool1"
 }
 layer {
   name: "conv2"
@@ -113,25 +90,16 @@ layer {
     lr_mult: 2
   }
   weights_compress:"Ternary_Quantize"
-  weights_compress_param{
-    maxbits:8
-  }
-  weights_compress:"Quantize"
-  weights_compress_param{
-    maxbits:8
-  }
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
-  }
+  weights_compress:"Ternary_Quantize"
+  activations_compress:"Ternary_Quantize"
   convolution_param {
-    num_output: 32
+    num_output: 64
     pad: 2
     kernel_size: 5
     stride: 1
     weight_filler {
       type: "gaussian"
-      std: 0.01
+	  std:0.001
     }
     bias_filler {
       type: "constant"
@@ -150,13 +118,9 @@ layer {
   bottom: "conv2"
   top: "pool2"
   pooling_param {
-    pool: AVE
+    pool: MAX
     kernel_size: 3
     stride: 2
-  }
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
   }
 }
 layer {
@@ -165,25 +129,16 @@ layer {
   bottom: "pool2"
   top: "conv3"
   weights_compress:"Ternary_Quantize"
-  weights_compress_param{
-    maxbits:8
-  }
-  weights_compress:"Quantize"
-  weights_compress_param{
-    maxbits:8
-  }
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
-  }
+  weights_compress:"Ternary_Quantize"
+  activations_compress:"Ternary_Quantize"
   convolution_param {
-    num_output: 64
+    num_output: 128
     pad: 2
     kernel_size: 5
     stride: 1
     weight_filler {
       type: "gaussian"
-      std: 0.01
+	  std:0.001
     }
     bias_filler {
       type: "constant"
@@ -202,13 +157,9 @@ layer {
   bottom: "conv3"
   top: "pool3"
   pooling_param {
-    pool: AVE
+    pool: MAX
     kernel_size: 3
     stride: 2
-  }
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
   }
 }
 layer {
@@ -224,23 +175,11 @@ layer {
     lr_mult: 2
     decay_mult: 0
   }
-  weights_compress:"Quantize"
-  weights_compress_param{
-    maxbits:8
-  }
-  weights_compress:"Quantize"
-  weights_compress_param{
-    maxbits:8
-  }
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
-  }
   inner_product_param {
     num_output: 10
     weight_filler {
       type: "gaussian"
-      std: 0.01
+	  std:0.001
     }
     bias_filler {
       type: "constant"
