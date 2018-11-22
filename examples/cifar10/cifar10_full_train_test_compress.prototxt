@@ -7,6 +7,7 @@ layer {
   include {
     phase: TRAIN
   }
+  activations_compress:"Quantize"
   transform_param {
     mean_file: "examples/cifar10/mean_quantize.binaryproto"
   }
@@ -24,6 +25,7 @@ layer {
   include {
     phase: TEST
   }
+  activations_compress:"Quantize"
   transform_param {
     mean_file: "examples/cifar10/mean_quantize.binaryproto"
   }
@@ -46,7 +48,6 @@ layer {
   }
   weights_compress:"Ternary_Quantize"
   weights_compress:"Ternary_Quantize"
-  activations_compress:"Ternary_Quantize"
   convolution_param {
     num_output: 32
     pad: 2
