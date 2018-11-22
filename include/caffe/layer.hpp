@@ -724,11 +724,11 @@ inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
 			}
 		}
 		if(ttopbit>topbit){
-			topbit=ttopbit
+			topbit=ttopbit;
 			std::cout<<layer_param_.name()<<" Top max bit is "<<topbit<<std::endl;
 		}
 		if(tbottombit>bottombit){
-			bottombit=tbottombit
+			bottombit=tbottombit;
 			std::cout<<layer_param_.name()<<" Bottom max bit is "<<bottombit<<std::endl;
 		}
 	}
