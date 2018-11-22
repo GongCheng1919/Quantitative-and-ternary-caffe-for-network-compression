@@ -33,7 +33,7 @@ layer {
     batch_size: 100
     backend: LMDB
   }
-  activations_compress:"TQuantize"
+  activations_compress:"Quantize"
 }
 layer {
   name: "conv1"
