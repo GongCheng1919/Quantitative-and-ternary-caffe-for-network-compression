@@ -705,7 +705,7 @@ inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
 		//计算top中最高的位
 		for (int i=0;i<bottom.size();i++){
 			//找到最大值
-			const Dtype* temp= bottom[i]->data();
+			const Dtype* temp= bottom[i]->cpu_data();
 			for(int j=0;j<bottom[i]->count();j++){
 				int bitwidth=ceil(log2(temp[j]))+1;
 				if(bitwidth>tbottombit){
@@ -715,7 +715,7 @@ inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
 		}
 		for (int i=0;i<top.size();i++){
 			//找到最大值
-			const Dtype* temp= top[i]->data();
+			const Dtype* temp= top[i]->cpu_data();
 			for(int j=0;j<top[i]->count();j++){
 				int bitwidth=ceil(log2(temp[j]))+1;
 				if(bitwidth>ttopbit){
