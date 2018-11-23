@@ -699,29 +699,31 @@ inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
 	//切换激活值为压缩表示
 	ExchangeCompressActivations(top);
 	if(phase_==TEST){
-		static Dtype topbit=0,bottombit=1000000;
-		Dtype ttopbit=topbit,tbottombit=bottombit;
-		//计算top中绝对最大值和绝对最小值。
-		for (int i=0;i<top.size();i++){
-			//找到最大值
-			const Dtype* temp= top[i]->cpu_data();
-			for(int j=0;j<top[i]->count();j++){
-				Dtype bitwidth=temp[j]>0?temp[j]:-temp[j];
-				if(bitwidth>ttopbit){
-					ttopbit=bitwidth;
-				}
-				if(bitwidth<tbottombit){
-					tbottombit=bitwidth;
+		//获取当前激活层的最大值，只需要计算当前值处以alpha及初始的2^8次方就好了
+		//首先计算当前层权值的alpha是多少
+		if(layer_param_.weights_compress_param_size()>0){
+			int fixedpos=layer_param_.weights_compress_param().fixedpos();
+			float alpha=layer_param_.weights_compress_param().alpha();
+			alpha=alpha*pow(2,fixedpos);
+			//float ascale=pow(2,8)*alpha;//假设输入特征缩放是2^-8.
+			static int topbit=0;
+			int ttopbit=topbit;
+			//计算top中绝对最大值和绝对最小值。
+			for (int i=0;i<top.size();i++){
+				//找到最大值
+				const Dtype* temp= top[i]->cpu_data();
+				for(int j=0;j<top[i]->count();j++){
+					const Dtype a=temp[j]>0?temp[j]:-temp[j];
+					int bitwidth=1+ceil(log2(a/alpha));
+					if(bitwidth>ttopbit){
+						ttopbit=bitwidth;
+					}
 				}
 			}
-		}
-		if(ttopbit>topbit){
-			topbit=ttopbit;
-			std::cout<<layer_param_.name()<<" Top abs max is "<<topbit<<std::endl;
-		}
-		if(tbottombit<bottombit){
-			bottombit=tbottombit;
-			std::cout<<layer_param_.name()<<" Top abs min is "<<bottombit<<std::endl;
+			if(ttopbit>topbit){
+				topbit=ttopbit;
+				std::cout<<layer_param_.name()<<" Top max bit is ("<<topbit<<"bit or "<<topbit+8<<"bit."<<std::endl;
+			}
 		}
 	}
   return loss;
