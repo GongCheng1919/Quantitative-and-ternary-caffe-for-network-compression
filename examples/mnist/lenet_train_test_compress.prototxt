@@ -62,10 +62,10 @@ layer {
   weights_compress_param{
     maxbits:8
   }
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
-  }
+  #activations_compress:"Quantize"
+  #activations_compress_param{
+  #  maxbits:8
+  #}
   convolution_param {
     num_output: 20
     kernel_size: 5
@@ -108,10 +108,10 @@ layer {
   weights_compress_param{
     maxbits:8
   }
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
-  }
+  #activations_compress:"Quantize"
+  #activations_compress_param{
+  #  maxbits:8
+  #}
   convolution_param {
     num_output: 50
     kernel_size: 5
@@ -154,10 +154,10 @@ layer {
   weights_compress_param{
     maxbits:8
   }
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
-  }
+  #activations_compress:"Quantize"
+  #activations_compress_param{
+  #  maxbits:8
+  #}
  # weights_compress:"Ternary_Quantize"
   inner_product_param {
     num_output: 500
@@ -194,10 +194,10 @@ layer {
   weights_compress_param{
     maxbits:8
   }
-  activations_compress:"Quantize"
-  activations_compress_param{
-    maxbits:8
-  }
+  #activations_compress:"Quantize"
+  #activations_compress_param{
+  #  maxbits:8
+  #}
   inner_product_param {
     num_output: 10
     weight_filler {
