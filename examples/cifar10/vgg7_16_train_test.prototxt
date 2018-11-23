@@ -7,9 +7,11 @@ layer {
   include {
     phase: TRAIN
   }
+  activations_compress: "Quantize"
   transform_param {
     mean_file: "examples/cifar10/mean.binaryproto"
 	mirror:1
+	scale:0.00390625
   }
   data_param {
     source: "examples/cifar10/cifar10_train_lmdb"
@@ -25,8 +27,10 @@ layer {
   include {
     phase: TEST
   }
+  activations_compress: "Quantize"
   transform_param {
     mean_file: "examples/cifar10/mean.binaryproto"
+	scale:0.00390625
   }
   data_param {
     source: "examples/cifar10/cifar10_test_lmdb"
@@ -61,37 +65,6 @@ layer {
   }
 }
 layer {
-    bottom: "conv1_1"
-    top: "conv1_1"
-    name: "bn1_1"
-    type: "BatchNorm"
-	param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }   
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }  
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }
-  batch_norm_param {
-		use_global_stats: false
-  }
-}
-layer {  
-  name: "scale1_1"  
-  type: "Scale"
-  bottom: "conv1_1"  
-  top: "conv1_1"    
-  scale_param {  
-    bias_term: true  
-  }  
-}
-
-layer {
   name: "relu1_1"
   type: "ReLU"
   bottom: "conv1_1"
@@ -122,37 +95,6 @@ layer {
       type: "constant"
     }
   }
-}
-
-layer {
-    bottom: "conv1_2"
-    top: "conv1_2"
-    name: "bn1_2"
-    type: "BatchNorm"
-	param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }   
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }  
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }
-  batch_norm_param {
-		use_global_stats: false
-  }
-}
-layer {  
-  name: "scale1_2"  
-  type: "Scale"
-  bottom: "conv1_2"  
-  top: "conv1_2"    
-  scale_param {  
-    bias_term: true  
-  }  
 }
 layer {
   name: "relu1_2"
@@ -198,36 +140,6 @@ layer {
   }
 }
 layer {
-    bottom: "conv2_1"
-    top: "conv2_1"
-    name: "bn2_1"
-    type: "BatchNorm"
-	param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }   
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }  
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }
-  batch_norm_param {
-		use_global_stats: false
-  }
-}
-layer {  
-  name: "scale2_1"  
-  type: "Scale"
-  bottom: "conv2_1"  
-  top: "conv2_1"    
-  scale_param {  
-    bias_term: true  
-  }  
-}
-layer {
   name: "relu2_1"
   type: "ReLU"
   bottom: "conv2_1"
@@ -257,36 +169,6 @@ layer {
       type: "constant"
     }
   }
-}
-layer {
-    bottom: "conv2_2"
-    top: "conv2_2"
-    name: "bn2_2"
-    type: "BatchNorm"
-	param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }   
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }  
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }
-  batch_norm_param {
-		use_global_stats: false
-  }
-}
-layer {  
-  name: "scale2_2"  
-  type: "Scale"
-  bottom: "conv2_2"  
-  top: "conv2_2"    
-  scale_param {  
-    bias_term: true  
-  }  
 }
 layer {
   name: "relu2_2"
@@ -333,36 +215,6 @@ layer {
   }
 }
 layer {
-    bottom: "conv3_1"
-    top: "conv3_1"
-    name: "bn3_1"
-    type: "BatchNorm"
-	param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }   
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }  
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }
-  batch_norm_param {
-		use_global_stats: false
-  }
-}
-layer {  
-  name: "scale3_1"  
-  type: "Scale"
-  bottom: "conv3_1"  
-  top: "conv3_1"    
-  scale_param {  
-    bias_term: true  
-  }  
-}
-layer {
   name: "relu3_1"
   type: "ReLU"
   bottom: "conv3_1"
@@ -395,36 +247,6 @@ layer {
   }
 }
 layer {
-    bottom: "conv3_2"
-    top: "conv3_2"
-    name: "bn3_2"
-    type: "BatchNorm"
-	param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }   
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }  
-  param {  
-    lr_mult: 0  
-    decay_mult: 0  
-  }
-  batch_norm_param {
-		use_global_stats: false
-  }
-}
-layer {  
-  name: "scale3_2"  
-  type: "Scale"
-  bottom: "conv3_2"  
-  top: "conv3_2"    
-  scale_param {  
-    bias_term: true  
-  }  
-}
-layer {
   name: "relu3_2"
   type: "ReLU"
   bottom: "conv3_2"
@@ -449,7 +271,7 @@ layer {
   top: "ip1"
   param {
     lr_mult: 1
-	decay_mult:40
+	decay_mult:2
   }
   param {
     lr_mult: 2
@@ -486,7 +308,7 @@ layer {
   top: "ip2"
   param {
     lr_mult: 1
-	decay_mult:40
+	decay_mult:2
   }
   param {
     lr_mult: 2
@@ -513,6 +335,13 @@ layer {
   }
 }
 layer {
+  name: "loss"
+  type: "SoftmaxWithLoss"
+  bottom: "ip2"
+  bottom: "label"
+  top: "loss"
+}
+layer {
   name: "accuracy_5"
   type: "Accuracy"
   bottom: "ip2"
@@ -525,13 +354,6 @@ layer {
   include {
     phase: TEST
   }
-}
-layer {
-  name: "loss"
-  type: "SoftmaxWithLoss"
-  bottom: "ip2"
-  bottom: "label"
-  top: "loss"
 }
 
 

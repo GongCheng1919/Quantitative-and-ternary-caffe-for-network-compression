@@ -17,7 +17,7 @@ layer {
     batch_size: 100
     backend: LMDB
   }
-  activations_compress:"Quantize"
+  #activations_compress:"Quantize"
 }
 layer {
   name: "cifar"
@@ -36,7 +36,7 @@ layer {
     batch_size: 100
     backend: LMDB
   }
-  activations_compress:"Quantize"
+  ##activations_compress:"Quantize"
 }
 #conv1:3*3*64
 layer {
@@ -52,8 +52,8 @@ layer {
     lr_mult: 2
   }
   weights_compress:"Ternary_Quantize"
-  weights_compress:"Ternary_Quantize"
-  activations_compress:"Ternary_Quantize"
+  weights_compress:"Quantize"
+  #activations_compress:"Quantize"
   convolution_param {
     num_output: 64
     pad: 1
@@ -118,8 +118,8 @@ layer {
     lr_mult: 2
   }
   weights_compress:"Ternary_Quantize"
-  weights_compress:"Ternary_Quantize"
-  activations_compress:"Ternary_Quantize"
+  weights_compress:"Quantize"
+  #activations_compress:"Quantize"
   convolution_param {
     num_output: 64
     pad: 1
@@ -195,8 +195,8 @@ layer {
     lr_mult: 2
   }
     weights_compress:"Ternary_Quantize"
-  weights_compress:"Ternary_Quantize"
-  activations_compress:"Ternary_Quantize"
+  weights_compress:"Quantize"
+  #activations_compress:"Quantize"
   convolution_param {
     num_output: 128
     pad: 1
@@ -259,8 +259,8 @@ layer {
     lr_mult: 2
   }
   weights_compress:"Ternary_Quantize"
-  weights_compress:"Ternary_Quantize"
-  activations_compress:"Ternary_Quantize"
+  weights_compress:"Quantize"
+  #activations_compress:"Quantize"
   convolution_param {
     num_output: 128
     pad: 1
@@ -336,8 +336,8 @@ layer {
     lr_mult: 2
   }
   weights_compress:"Ternary_Quantize"
-  weights_compress:"Ternary_Quantize"
-  activations_compress:"Ternary_Quantize"
+  weights_compress:"Quantize"
+  #activations_compress:"Quantize"
   convolution_param {
     num_output: 256
     pad: 1
@@ -401,8 +401,8 @@ layer {
     lr_mult: 2
   }
   weights_compress:"Ternary_Quantize"
-  weights_compress:"Ternary_Quantize"
-  activations_compress:"Ternary_Quantize"
+  weights_compress:"Quantize"
+  #activations_compress:"Quantize"
   convolution_param {
     num_output: 256
     pad: 1
@@ -476,9 +476,9 @@ layer {
   param {
     lr_mult: 2
   }
-  weights_compress:"Ternary_Quantize"
-  weights_compress:"Ternary_Quantize"
-  #activations_compress:"Ternary_Quantize"
+  weights_compress:"Quantize"
+  weights_compress:"Quantize"
+  #activations_compress:"Quantize"
   inner_product_param {
     num_output: 1024
     weight_filler {
@@ -516,6 +516,9 @@ layer {
   param {
     lr_mult: 2
   }
+  weights_compress:"Quantize"
+  weights_compress:"Quantize"
+  #activations_compress:"Quantize"
   inner_product_param {
     num_output: 10
     weight_filler {
