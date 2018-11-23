@@ -702,8 +702,8 @@ inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
 		//获取当前激活层的最大值，只需要计算当前值处以alpha及初始的2^8次方就好了
 		//首先计算当前层权值的alpha是多少
 		if(layer_param_.weights_compress_param_size()>0){
-			int fixedpos=layer_param_.weights_compress_param().fixedpos();
-			float alpha=layer_param_.weights_compress_param().alpha();
+			int fixedpos=layer_param_.weights_compress_param(0).fixedpos();
+			float alpha=layer_param_.weights_compress_param(0).alpha();
 			alpha=alpha*pow(2,fixedpos);
 			//float ascale=pow(2,8)*alpha;//假设输入特征缩放是2^-8.
 			static int topbit=0;
