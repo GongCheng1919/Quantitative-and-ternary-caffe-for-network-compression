@@ -291,6 +291,13 @@ class Blob {
   int get_fixedpos() const;
   int get_maxbits() const;
   void quantize_data(Phase phase = TRAIN,CompressParameter compress_param=CompressParameter(),string compress_type="weights");
+  //compress_param:the weights compress params
+  void clip_activations(CompressParameter compress_param=CompressParameter(), int max_bits=8);
+  //ulq
+  void ulq_weights(Phase phase = TRAIN,CompressParameter compress_param=CompressParameter());
+  //对于激活值的量化，想要设置一个滑动平均系数，并且保留估计的整体样本的均值和标准差，在测试的时候直接应用
+  void ulq_activations(Phase phase = TRAIN,CompressParameter compress_param=CompressParameter(),float lambda=0.99);
+  
 
 
 
@@ -333,7 +340,7 @@ class Blob {
   int fixedpos_;
   int maxbits_;
   bool EXCHANGE_DATA_QUANTIZE_;
-  
+  //lambda table
   vector<int> shape_;
   int count_;
   int capacity_;

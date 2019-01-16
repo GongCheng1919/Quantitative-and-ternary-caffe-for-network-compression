@@ -608,5 +608,316 @@ void caffe_gpu_quantizea<float>(const int count, const float* X, float* Y, int* 
 	//stime=(double)(clock() - ed)/CLOCKS_PER_SEC;
 	//LOG(INFO)<<"quantize time is "<<stime*1000<<"ms";
 }
+//Clip quantization
+template <typename Dtype>
+__global__ void quantize_kernel(const int n,Dtype* X, Dtype max_pos,Dtype max_neg){
+	CUDA_KERNEL_LOOP(index, n){
+		if(X[index]>max_pos){
+			X[index]=max_pos;
+		}
+		if(X[index]<max_neg){
+			X[index]=max_neg;
+		}
+	}
+}
+template<>
+void caffe_gpu_quantizeb<int>(const int count, int* X, int max_bits){}
+template<>
+void caffe_gpu_quantizeb<unsigned>(const int count, unsigned* X, int max_bits){}
+template<>
+void caffe_gpu_quantizeb<float>(const int count, float* X, int max_bits){
+	//实现剪切
+	float max_pos=(float)pow(2,max_bits-1)-1;
+	float max_neg=-(float)pow(2,max_bits-1);
+	quantize_kernel << <CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS >> >(count,X,max_pos,max_neg);
+}
+template<>
+void caffe_gpu_quantizeb<double>(const int count, double* X, int max_bits){
+	//实现剪切
+	double max_pos=(double)pow(2,max_bits-1)-1;
+	double max_neg=-(double)pow(2,max_bits-1);
+	quantize_kernel << <CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS >> >(count,X,max_pos,max_neg);
+}
+//scale clip
+template <typename Dtype>
+__global__ void round_kernel(const int n,Dtype* X){
+	CUDA_KERNEL_LOOP(index, n){
+		X[index] = (X[index] > 0.0) ? floor(X[index] + 0.5) : ceil(X[index] - 0.5);
+	}
+}
+template<>
+void caffe_gpu_quantizec<int>(const int count, int* X, int max_bits){}
+template<>
+void caffe_gpu_quantizec<unsigned>(const int count, unsigned* X, int max_bits){}
+template<>
+void caffe_gpu_quantizec<float>(const int count, float* X, int max_bits){
+	//首先找到最大值，进行缩放，缩放到[-127,127]之间（-128不能取到）
+	int max_index;
+	CUBLAS_CHECK(cublasIsamax(Caffe::cublas_handle(),count, X, 1, &max_index));
+	float max_n;
+	caffe_gpu_getcudavalue(X,max_index-1,&max_n);//cublas的数组下标从1开始
+	max_n=fabsf(max_n);
+	//scale:scaler=127/max_n;
+	float dst_range=(float)pow(2,max_bits-1)-1;
+	float scaler=dst_range/max_n;
+	caffe_gpu_scale(count, scaler, X, X);
+	////量化为整型
+	round_kernel << <CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS >> >(count,X);
+}
+template<>
+void caffe_gpu_quantizec<double>(const int count, double* X, int max_bits){
+	//首先找到最大值，进行缩放，缩放到[-127,127]之间（-128不能取到）
+	int max_index;
+	CUBLAS_CHECK(cublasIdamax(Caffe::cublas_handle(),count, X, 1, &max_index));
+	double max_n;
+	caffe_gpu_getcudavalue(X,max_index-1,&max_n);//cublas的数组下标从1开始
+	max_n=fabsf(max_n);
+	//scale:scaler=127/max_n;
+	double dst_range=(double)pow(2,max_bits-1)-1;
+	double scaler=dst_range/max_n;
+	caffe_gpu_scale(count, scaler, X, X);
+	////量化为整型
+	round_kernel << <CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS >> >(count,X);
+}
+//meanstd
+__global__ void block_Ssum(const int n, const float *X, float *result)
+{
+	extern __shared__ float sdata[];
+	sdata[threadIdx.x] = 0;
+	//__syncthreads();//等待所有线程把自己负责的元素载入到共享内存
+	CUDA_KERNEL_LOOP(i, n){
+		sdata[threadIdx.x] += X[i];
+	}
+	__syncthreads();//等待所有线程把自己负责的元素载入到共享内存
+		for(int offset = blockDim.x / 2;offset > 0;offset >>= 1){
+			if(threadIdx.x < offset)//控制只有某些线程才进行操作。
+			{
+				// add a partial sum upstream to our own
+				sdata[threadIdx.x] += sdata[threadIdx.x + offset];
+			}
+			// wait until all threads in the block have
+			// updated their partial sums
+			__syncthreads();
+		}
+		if(threadIdx.x == 0)
+		{
+			result[blockIdx.x] = sdata[0];
+		}
+}
+__global__ void block_Dsum(const int n, const double *X, double *result)
+{
+	extern __shared__ double sdata1[];
+	sdata1[threadIdx.x] = 0;
+	__syncthreads();//等待所有线程把自己负责的元素载入到共享内存
+	CUDA_KERNEL_LOOP(i, n){
+		sdata1[threadIdx.x] += X[i];
+	}
+	__syncthreads();//等待所有线程把自己负责的元素载入到共享内存
+		for(int offset = blockDim.x / 2;offset > 0;offset >>= 1){
+			if(threadIdx.x < offset)//控制只有某些线程才进行操作。
+			{
+				// add a partial sum upstream to our own
+				sdata1[threadIdx.x] += sdata1[threadIdx.x + offset];
+			}
+			// wait until all threads in the block have
+			// updated their partial sums
+			__syncthreads();
+		}
+		if(threadIdx.x == 0)
+		{
+			result[blockIdx.x] = sdata1[0];
+		}
+}
+template<class DType>
+__global__ void block_sum(const DType *input,DType *per_block_results,const size_t n)
+{
+	extern __shared__ DType sdata[];
+	unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+	// load input into __shared__ memory //一个线程负责把一个元素从全局内存载入到共享内存
+	DType x = 0;
+	if(i < n)
+	{
+		x = input[i];
+	}
+	sdata[threadIdx.x] = x;
+	__syncthreads();//等待所有线程把自己负责的元素载入到共享内存
+	// contiguous range pattern//块内进行合并操作，每次合并变为一半.注意threadIdx.x是块内的偏移，上面算出的i是全局的偏移。
+	for(int offset = blockDim.x / 2;offset > 0;offset >>= 1){
+		if(threadIdx.x < offset)//控制只有某些线程才进行操作。
+		{
+			// add a partial sum upstream to our own
+			sdata[threadIdx.x] += sdata[threadIdx.x + offset];
+		}
+		// wait until all threads in the block have
+		// updated their partial sums
+		__syncthreads();
+	}
+	// thread 0 writes the final result//每个块的线程0负责存放块内求和的结果
+	if(threadIdx.x == 0)
+	{
+		per_block_results[blockIdx.x] = sdata[0];
+	}
+}
+
+template <>
+void caffe_gpu_sum<int>(const int n, const int* x, int* y){}
+template <>
+void caffe_gpu_sum<unsigned>(const int n, const unsigned* x, unsigned* y){}
+template <>
+void caffe_gpu_sum<float>(const int n, const float* x, float* y){
+	const int block_size = CAFFE_CUDA_NUM_THREADS;//线程块的大小。
+	int num_elements = n;
+	int num_blocks = CAFFE_GET_BLOCKS(n);
+	float *dev_input_array = 0;
+	float *dev_block_sums = 0;//一个线程块一个和。
+	while(num_elements > block_size)
+	{
+		if(dev_block_sums == 0)//第一次
+		{
+			dev_input_array = (float*)x;
+		}
+		else //除了第一次
+		{
+			//除了第一次的中间结果都进行销毁
+			if(dev_input_array != x){
+				CUDA_CHECK(cudaFree(dev_input_array));
+			}
+			dev_input_array = dev_block_sums;
+		}
+		//num_blocks = (num_elements/block_size) + ((num_elements%block_size) ? 1 : 0);
+		//给输出结果分配内存
+		CUDA_CHECK(cudaMalloc((void**)&dev_block_sums, sizeof(float) * (num_blocks )));
+		// launch one kernel to compute, per-block, a partial sum//把每个线程块的和求出来
+		block_Ssum<<<num_blocks,block_size, block_size*sizeof(float)>>>(num_elements,dev_input_array, dev_block_sums);
+		//每一块有一个结果，总的结果数量就是输出的块数
+		num_elements = num_blocks;
+		//下次的迭代块数
+		num_blocks = CAFFE_GET_BLOCKS(num_blocks);
+	}
+	float* res=0;
+	CUDA_CHECK(cudaMalloc((void**)&res, sizeof(float)));
+	float result=0;
+	//能够用一个块装下所有的数据了，这时候做一个块的计算
+	block_Ssum<<<1,num_elements,num_elements*sizeof(float)>>>(num_elements,dev_block_sums, res );
+	CUDA_CHECK(cudaMemcpy(&result, res, sizeof(float), cudaMemcpyDeviceToHost));
+	//释放最后一次的结果
+	CUDA_CHECK(cudaFree(res));
+	CUDA_CHECK(cudaFree(dev_block_sums));
+	*y=result;
+}
+template <>
+void caffe_gpu_sum<double>(const int n, const double* x, double* y){
+	const int block_size = CAFFE_CUDA_NUM_THREADS;//线程块的大小。
+	int num_elements = n;
+	int num_blocks = CAFFE_GET_BLOCKS(n);
+	double *dev_input_array = 0;
+	double *dev_block_sums = 0;//一个线程块一个和。
+	while(num_elements > block_size)
+	{
+		if(dev_block_sums == 0)//第一次
+		{
+			dev_input_array = (double*)x;
+		}
+		else //除了第一次
+		{
+			//除了第一次的中间结果都进行销毁
+			if(dev_input_array != x){
+				CUDA_CHECK(cudaFree(dev_input_array));
+			}
+			dev_input_array = dev_block_sums;
+		}
+		//num_blocks = (num_elements/block_size) + ((num_elements%block_size) ? 1 : 0);
+		//给输出结果分配内存
+		CUDA_CHECK(cudaMalloc((void**)&dev_block_sums, sizeof(double) * (num_blocks )));
+		// launch one kernel to compute, per-block, a partial sum//把每个线程块的和求出来
+		block_Dsum<<<num_blocks,block_size,block_size*sizeof(double)>>>(num_elements,dev_input_array, dev_block_sums);
+		//每一块有一个结果，总的结果数量就是输出的块数
+		num_elements = num_blocks;
+		//下次的迭代块数
+		num_blocks = CAFFE_GET_BLOCKS(num_blocks);
+	}
+	double* res=0;
+	double result=0;
+	CUDA_CHECK(cudaMalloc((void**)&res, sizeof(double)));
+	//能够用一个块装下所有的数据了，这时候做一个块的计算
+	block_Dsum<<<1,num_elements,num_elements*sizeof(double)>>>(num_elements,dev_block_sums, res );
+	CUDA_CHECK(cudaMemcpy(&result, res, sizeof(double), cudaMemcpyDeviceToHost));
+	//释放最后一次的结果
+	CUDA_CHECK(cudaFree(res));
+	//释放最后一次的结果
+	CUDA_CHECK(cudaFree(dev_block_sums));
+	*y=result;
+}
+
+template<>
+void caffe_gpu_meanstd<int>(const int count, const int* X, int& mean, int& std){}
+template<>
+void caffe_gpu_meanstd<unsigned>(const int count, const unsigned* X, unsigned& mean, unsigned& std){}
+template<>
+void caffe_gpu_meanstd<float>(const int count, const float* X, float& mean, float& stds){
+	//calc mean
+	float total;
+	//CUBLAS_CHECK(cublasSsum(Caffe::cublas_handle(), count, X, 1, &total));
+	//float X0=0,Xc=0;
+	//caffe_gpu_getcudavalue(X,0, &X0);
+	//caffe_gpu_getcudavalue(X,count-1, &Xc);
+	//LOG(INFO)<<"count="<<count<<",X[0]="<<X0<<",X[count-1]="<<Xc;
+	//LOG(INFO)<<"calc sum by GPU!";
+	//caffe_gpu_sum(count,X,&total);
+	thrust::device_ptr<const float> dev_ptr(X);
+	total=thrust::reduce(dev_ptr, dev_ptr + size_t(count), (float)0, thrust::plus<float>());
+	mean=total/count;
+	//LOG(INFO)<<"GPU sum is "<<total;
+	//calc std
+	//LOG(INFO)<<"calc square_sum by GPU!";
+	caffe_gpu_dot(count, X, X,&total);
+	stds=sqrt(total/count-pow(mean,2));
+	//LOG(INFO)<<"GPU mean="<<mean<<",std="<<stds;
+}
+template<>
+void caffe_gpu_meanstd<double>(const int count, const double* X, double& mean, double& stds){
+	//calc mean
+	double total;
+	//CUBLAS_CHECK(cublasDsum(Caffe::cublas_handle(), count, X, 1, &total));
+	thrust::device_ptr<const double> dev_ptr(X);
+	total=thrust::reduce(dev_ptr, dev_ptr + size_t(count), (double)0, thrust::plus<double>());
+	mean=total/count;
+	//calc std
+	caffe_gpu_dot(count, X, X,&total);
+	stds=sqrt(total/count-pow(mean,2));
+	//LOG(INFO)<<"GPU mean="<<mean<<",std="<<stds;
+}
+
+//ulq
+//ULQ：Q=Round(      Clip          ((F-delta)*alpha+0.5))#alpha=1/alpha,此处是为了避免除法
+//		       [1-2^(k-1),2^(k-1)]
+template <typename Dtype>
+__global__ void ulq_kernel(const int n,const Dtype mean_old,const Dtype sigma_old,const Dtype maxs,const Dtype mins,const Dtype* X,Dtype* Y){
+	CUDA_KERNEL_LOOP(index, n){
+		//scale
+		Y[index]=(X[index]-mean_old)*sigma_old+0.5;
+		//clip
+		if(Y[index]>maxs){Y[index]=maxs;}
+		if(Y[index]<mins){Y[index]=mins;}
+		//round
+		Y[index] = (Y[index] > 0.0) ? floor(Y[index] + 0.5) : ceil(Y[index] - 0.5);
+		//需要还原，宝贝
+		//还原为相同的range，以进行前向传播
+		Y[index]=((Y[index]-0.5)/sigma_old)+mean_old;
+	}
+}
+template<>
+void caffe_gpu_ulq<int>(const int count, const int mean_old, const int sigma_old,const int* X, int* Y, int max_bits){}
+template<>
+void caffe_gpu_ulq<unsigned>(const int count, const unsigned mean_old, const unsigned sigma_old,const unsigned* X, unsigned* Y, int max_bits){}
+template<>
+void caffe_gpu_ulq<float>(const int count, const float mean_old, const float sigma_old,const float* X, float* Y, int max_bits){
+	float mins=1-pow(2,max_bits-1);
+	float maxs=pow(2,max_bits-1);
+	ulq_kernel << <CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS >> >(count,mean_old,sigma_old,maxs,mins,X,Y);
+}
+template<>
+void caffe_gpu_ulq<double>(const int count, const double mean_old, const double sigma_old,const double* X, double* Y, int max_bits){}
+
 
 }  // namespace caffe

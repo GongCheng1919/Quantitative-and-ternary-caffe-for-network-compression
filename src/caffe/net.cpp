@@ -37,6 +37,7 @@ Net<Dtype>::Net(const string& param_file, Phase phase,
     }
   }
   //输出载入的参数
+  /*
   for(int i=0;i<param.layer_size();i++){
 	  std::cout<<"\n"<<param.layer(i).name()<<": activations_compress_param_size="
 	  <<param.layer(i).activations_compress_param_size()<<"\n";
@@ -46,7 +47,7 @@ Net<Dtype>::Net(const string& param_file, Phase phase,
 					<<",fixedpos="<<param.layer(i).activations_compress_param(0).fixedpos()
 					<<",maxbits="<<param.layer(i).activations_compress_param(0).maxbits();
 	  }
-  }
+  }*/
   param.mutable_state()->set_level(level);
   Init(param);
 }

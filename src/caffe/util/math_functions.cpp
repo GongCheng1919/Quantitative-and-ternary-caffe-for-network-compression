@@ -511,4 +511,143 @@ void caffe_cpu_quantizea<double>(const int count, const double* X, double* Y, in
 	}
 }
 
+
+//quantization——planb
+template<>
+void caffe_cpu_quantizeb<int>(const int count, int* X, int max_bits){}
+template<>
+void caffe_cpu_quantizeb<unsigned>(const int count, unsigned* X, int max_bits){}
+template<>
+void caffe_cpu_quantizeb<float>(const int count, float* X, int max_bits){
+	//实现剪切
+	float max_pos=(float)pow(2,max_bits-1)-1;
+	float max_neg=-(float)pow(2,max_bits-1);
+	for(int i=0;i<count;i++){
+		//std::cout<<"value="<<X[i]<<",max_pos="<<max_pos<<",max_neg="<<max_neg<<std::endl;
+		if(X[i]>max_pos){
+			X[i]=max_pos;
+		}
+		if(X[i]<max_neg){
+			X[i]=max_neg;
+		}
+	}
+}
+template<>
+void caffe_cpu_quantizeb<double>(const int count, double* X, int max_bits){
+	//实现剪切
+	double max_pos=(double)pow(2,max_bits-1)-1;
+	double max_neg=-(double)pow(2,max_bits-1);
+	for(int i=0;i<count;i++){
+		//std::cout<<"value="<<X[i]<<",max_pos="<<max_pos<<",max_neg="<<max_neg<<std::endl;
+		if(X[i]>max_pos){
+			X[i]=max_pos;
+		}
+		if(X[i]<max_neg){
+			X[i]=max_neg;
+		}
+	}
+}
+//scale clip
+template<>
+void caffe_cpu_quantizec<int>(const int count, int* X, int max_bits){}
+template<>
+void caffe_cpu_quantizec<unsigned>(const int count, unsigned* X, int max_bits){}
+template<>
+void caffe_cpu_quantizec<float>(const int count, float* X, int max_bits){
+	//首先找到最大值，进行缩放，缩放到[-127,127]之间（-128不能取到）
+	float max_n = fabsf(X[0]);
+	for (int i = 1; i < count; i++){
+		const float absx = X[i]>=0?X[i]:-X[i];
+		//if (absx < min_n){ min_n = absx; }
+		if (absx >max_n){ max_n = absx; }
+	}
+	//scale:scaler=127/max_n;
+	float dst_range=(float)pow(2,max_bits-1)-1;
+	float scaler=dst_range/max_n;
+	caffe_cpu_scale(count, scaler, X, X);
+	//量化为整型
+	for (int i = 0; i < count; i++){
+		X[i] = (X[i] > 0.0) ? floor(X[i] + 0.5) : ceil(X[i] - 0.5);
+	}
+}
+template<>
+void caffe_cpu_quantizec<double>(const int count, double* X, int max_bits){
+	//首先找到最大值，进行缩放，缩放到[-127,127]之间（-128不能取到）
+	double max_n = fabsf(X[0]);
+	for (int i = 1; i < count; i++){
+		const double absx = X[i]>=0?X[i]:-X[i];
+		//if (absx < min_n){ min_n = absx; }
+		if (absx >max_n){ max_n = absx; }
+	}
+	//scale:scaler=127/max_n;
+	double dst_range=(double)pow(2,max_bits-1)-1;
+	double scaler=dst_range/max_n;
+	caffe_cpu_scale(count, scaler, X, X);
+	//量化为整型
+	for (int i = 0; i < count; i++){
+		X[i] = (X[i] > 0.0) ? floor(X[i] + 0.5) : ceil(X[i] - 0.5);
+	}
+}
+//ulq
+//ULQ：Q=Round(      Clip          ((F-delta)*alpha+0.5))#alpha=1/alpha,此处是为了避免除法
+//		       [1-2^(k-1),2^(k-1)]
+template<>
+void caffe_cpu_ulq<int>(const int count, const int mean_old, const int sigma_old,const int* X, int* Y, int max_bits){}
+template<>
+void caffe_cpu_ulq<unsigned>(const int count, const unsigned mean_old, const unsigned sigma_old,const unsigned* X, unsigned* Y, int max_bits){}
+template<>
+void caffe_cpu_ulq<float>(const int count, const float mean_old, const float sigma_old,const float* X, float* Y, int max_bits){
+	float mins=1-pow(2,max_bits-1);
+	float maxs=pow(2,max_bits-1);
+	for(int i=0;i<count;i++){
+		//scale
+		Y[i]=(X[i]-mean_old)*sigma_old+0.5;
+		//clip
+		if(Y[i]>maxs){Y[i]=maxs;}
+		if(Y[i]<mins){Y[i]=mins;}
+		//round
+		Y[i]=(Y[i] > 0.0) ? floor(Y[i] + 0.5) : ceil(Y[i] - 0.5);
+		
+		//还原为相同的range，以进行前向传播
+		Y[i]=((Y[i]-0.5)/sigma_old)+mean_old;
+	}
+}
+template<>
+void caffe_cpu_ulq<double>(const int count, const double mean_old, const double sigma_old,const double* X, double* Y, int max_bits){}
+//meanstd
+template<>
+void caffe_cpu_meanstd<int>(const int count, const int* X, int& mean, int& std){}
+template<>
+void caffe_cpu_meanstd<unsigned>(const int count, const unsigned* X, unsigned& mean, unsigned& std){}
+template<>
+void caffe_cpu_meanstd<float>(const int count, const float* X, float& mean, float& stds){
+	//calc mean
+	//float total=cblas_ssum(count, X, 1);
+	//LOG(INFO)<<"count="<<count<<",X[0]="<<X[0]<<",X[count-1]="<<X[count-1];
+	float total=0.0;
+	for(int i=0;i<count;i++){
+		total+=X[i];
+	}
+	mean=total/count;
+	//LOG(INFO)<<"CPU sum is "<<total;
+	//calc std
+	total=caffe_cpu_dot(count, X, X);
+	stds=sqrt(total/count-pow(mean,2));
+	//LOG(INFO)<<"CPU mean="<<mean<<",std="<<stds;
+}
+template<>
+void caffe_cpu_meanstd<double>(const int count, const double* X, double& mean, double& stds){
+	//calc mean
+	//double total=cblas_dsum(count, X, 1);
+	double total=0.0;
+	for(int i=0;i<count;i++){
+		total+=X[i];
+	}
+	mean=total/count;
+	//calc std
+	total=caffe_cpu_dot(count, X, X);
+	stds=sqrt(total/count-pow(mean,2));
+	//LOG(INFO)<<"mean="<<mean<<",std="<<stds;
+}
+
 }  // namespace caffe
