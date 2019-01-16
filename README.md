@@ -7,7 +7,7 @@ You need to change the configuration file (Makeconfig) according to your platfor
 Once the compilation is complete, you can add the specified compression parameters to each layer to indicate the compression operations the layer needs to perform:
 
 ### weights_compress: 
- Optional parameter: ""(default),"Ternary","Ternary_Quantize","Quantize","ULQ"(ULQ for $\mu$L2Q method)
+ Optional parameter: ""(default),"Ternary","Ternary_Quantize","Quantize","ULQ"(ULQ for uL2Q method)
 ### weights_caompress_param: 
  Optional parameter:  
  
@@ -20,7 +20,7 @@ Once the compilation is complete, you can add the specified compression paramete
  maxbits: Store the maximum number of quantized integers (for quantize)
  
  ### activations_compress: 
-Optional parameter: ""(default),"Ternary","Ternary_Quantize","Quantize","Clip"
+Optional parameter: ""(default),"Ternary","Ternary_Quantize","Quantize","Clip"(enforce the bit width of activations)
  ### activations_compress_param:
  Optional parameter: Same as weights_compress_param
 
